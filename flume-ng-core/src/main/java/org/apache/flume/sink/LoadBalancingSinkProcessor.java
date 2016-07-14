@@ -87,24 +87,20 @@ public class LoadBalancingSinkProcessor extends AbstractSinkProcessor {
   public static final String SELECTOR_NAME_ROUND_ROBIN_BACKOFF = "ROUND_ROBIN_BACKOFF";
   public static final String SELECTOR_NAME_RANDOM_BACKOFF = "RANDOM_BACKOFF";
 
-  private static final Logger LOGGER = LoggerFactory
-      .getLogger(LoadBalancingSinkProcessor.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(LoadBalancingSinkProcessor.class);
 
   private SinkSelector selector;
 
   @Override
   public void configure(Context context) {
     Preconditions.checkState(getSinks().size() > 1,
-        "The LoadBalancingSinkProcessor cannot be used for a single sink. "
-        + "Please configure more than one sinks and try again.");
+        "The LoadBalancingSinkProcessor cannot be used for a single sink. " +
+        "Please configure more than one sinks and try again.");
 
-    String selectorTypeName = context.getString(CONFIG_SELECTOR,
-        SELECTOR_NAME_ROUND_ROBIN);
-
-    Boolean shouldBackOff = context.getBoolean(CONFIG_BACKOFF, false);
+    String selectorTypeName = context.getString(CONFIG_SELECTOR, SELECTOR_NAME_ROUND_ROBIN);
+    Boolean shouldBackOff   = context.getBoolean(CONFIG_BACKOFF, false);
 
     selector = null;
-
     if (selectorTypeName.equalsIgnoreCase(SELECTOR_NAME_ROUND_ROBIN)) {
       selector = new RoundRobinSinkSelector(shouldBackOff);
     } else if (selectorTypeName.equalsIgnoreCase(SELECTOR_NAME_RANDOM)) {
@@ -112,19 +108,15 @@ public class LoadBalancingSinkProcessor extends AbstractSinkProcessor {
     } else {
       try {
         @SuppressWarnings("unchecked")
-        Class<? extends SinkSelector> klass = (Class<? extends SinkSelector>)
-            Class.forName(selectorTypeName);
-
+        Class<? extends SinkSelector> klass = (Class<? extends SinkSelector>) Class.forName(selectorTypeName);
         selector = klass.newInstance();
       } catch (Exception ex) {
-        throw new FlumeException("Unable to instantiate sink selector: "
-            + selectorTypeName, ex);
+        throw new FlumeException("Unable to instantiate sink selector: " + selectorTypeName, ex);
       }
     }
 
     selector.setSinks(getSinks());
-    selector.configure(
-        new Context(context.getSubProperties(CONFIG_SELECTOR_PREFIX)));
+    selector.configure(new Context(context.getSubProperties(CONFIG_SELECTOR_PREFIX)));
 
     LOGGER.debug("Sink selector: " + selector + " initialized");
   }
@@ -132,14 +124,12 @@ public class LoadBalancingSinkProcessor extends AbstractSinkProcessor {
   @Override
   public void start() {
     super.start();
-
     selector.start();
   }
 
   @Override
   public void stop() {
     super.stop();
-
     selector.stop();
   }
 
@@ -148,6 +138,10 @@ public class LoadBalancingSinkProcessor extends AbstractSinkProcessor {
     Status status = null;
 
     Iterator<Sink> sinkIterator = selector.createSinkIterator();
+    /**
+     * @as.notes
+     * 同样的策略，使用while循环语句，直至Sink成功process并有返回值才会退出循环，否则所有Sink全部尝试一遍。
+     * */
     while (sinkIterator.hasNext()) {
       Sink sink = sinkIterator.next();
       try {
@@ -155,8 +149,7 @@ public class LoadBalancingSinkProcessor extends AbstractSinkProcessor {
         break;
       } catch (Exception ex) {
         selector.informSinkFailed(sink);
-        LOGGER.warn("Sink failed to consume event. "
-            + "Attempting next sink if available.", ex);
+        LOGGER.warn("Sink failed to consume event. Attempting next sink if available.", ex);
       }
     }
 

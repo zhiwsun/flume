@@ -53,8 +53,7 @@ import org.slf4j.LoggerFactory;
  */
 public class LoggerSink extends AbstractSink implements Configurable {
 
-  private static final Logger logger = LoggerFactory
-      .getLogger(LoggerSink.class);
+  private static final Logger logger = LoggerFactory.getLogger(LoggerSink.class);
 
   // Default Max bytes to dump
   public static final int DEFAULT_MAX_BYTE_DUMP = 16;

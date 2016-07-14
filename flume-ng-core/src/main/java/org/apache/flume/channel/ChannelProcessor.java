@@ -52,8 +52,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ChannelProcessor implements Configurable {
 
-  private static final Logger LOG = LoggerFactory.getLogger(
-      ChannelProcessor.class);
+  private static final Logger LOG = LoggerFactory.getLogger(ChannelProcessor.class);
 
   private final ChannelSelector selector;
   private final InterceptorChain interceptorChain;
@@ -145,11 +144,9 @@ public class ChannelProcessor implements Configurable {
 
     events = interceptorChain.intercept(events);
 
-    Map<Channel, List<Event>> reqChannelQueue =
-        new LinkedHashMap<Channel, List<Event>>();
+    Map<Channel, List<Event>> reqChannelQueue = new LinkedHashMap<Channel, List<Event>>();
 
-    Map<Channel, List<Event>> optChannelQueue =
-        new LinkedHashMap<Channel, List<Event>>();
+    Map<Channel, List<Event>> optChannelQueue = new LinkedHashMap<Channel, List<Event>>();
 
     for (Event event : events) {
       List<Channel> reqChannels = selector.getRequiredChannels(event);

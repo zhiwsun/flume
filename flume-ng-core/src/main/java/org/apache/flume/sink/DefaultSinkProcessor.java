@@ -35,8 +35,7 @@ import com.google.common.base.Preconditions;
  * results without any additional handling. Suitable for all sinks that aren't
  * assigned to a group.
  */
-public class DefaultSinkProcessor implements SinkProcessor,
-ConfigurableComponent {
+public class DefaultSinkProcessor implements SinkProcessor, ConfigurableComponent {
   private Sink sink;
   private LifecycleState lifecycleState;
 
@@ -71,9 +70,8 @@ ConfigurableComponent {
   @Override
   public void setSinks(List<Sink> sinks) {
     Preconditions.checkNotNull(sinks);
-    Preconditions.checkArgument(sinks.size() == 1, "DefaultSinkPolicy can "
-        + "only handle one sink, "
-        + "try using a policy that supports multiple sinks");
+    Preconditions.checkArgument(sinks.size() == 1,
+            "DefaultSinkPolicy can only handle one sink, try using a policy that supports multiple sinks");
     sink = sinks.get(0);
   }
 

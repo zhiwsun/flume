@@ -70,12 +70,14 @@ public class FailoverSinkProcessor extends AbstractSinkProcessor {
     private Integer priority;
     private Sink sink;
     private Integer sequentialFailures;
+
     public FailedSink(Integer priority, Sink sink, int seqFailures) {
       this.sink = sink;
       this.priority = priority;
       this.sequentialFailures = seqFailures;
       adjustRefresh();
     }
+
     @Override
     public int compareTo(FailedSink arg0) {
       return refresh.compareTo(arg0.refresh);
@@ -88,24 +90,24 @@ public class FailoverSinkProcessor extends AbstractSinkProcessor {
     public Sink getSink() {
       return sink;
     }
+
     public Integer getPriority() {
       return priority;
     }
+
     public void incFails() {
       sequentialFailures++;
       adjustRefresh();
-      logger.debug("Sink {} failed again, new refresh is at {}, " +
-            "current time {}", new Object[] {
-              sink.getName(), refresh, System.currentTimeMillis()});
+      logger.debug("Sink {} failed again, new refresh is at {}, current time {}",
+                   new Object[] {sink.getName(), refresh, System.currentTimeMillis()});
     }
+
     private void adjustRefresh() {
-      refresh = System.currentTimeMillis()
-              + Math.min(maxPenalty, (1 << sequentialFailures) * FAILURE_PENALTY);
+      refresh = System.currentTimeMillis() + Math.min(maxPenalty, (1 << sequentialFailures) * FAILURE_PENALTY);
     }
   }
 
-  private static final Logger logger = LoggerFactory
-      .getLogger(FailoverSinkProcessor.class);
+  private static final Logger logger = LoggerFactory.getLogger(FailoverSinkProcessor.class);
 
   private static final String PRIORITY_PREFIX = "priority.";
   private static final String MAX_PENALTY_PREFIX = "maxpenalty";
@@ -127,8 +129,7 @@ public class FailoverSinkProcessor extends AbstractSinkProcessor {
       try {
         maxPenalty = Integer.parseInt(maxPenaltyStr);
       } catch (NumberFormatException e) {
-        logger.warn("{} is not a valid value for {}",
-                new Object[] { maxPenaltyStr, MAX_PENALTY_PREFIX });
+        logger.warn("{} is not a valid value for {}", new Object[] { maxPenaltyStr, MAX_PENALTY_PREFIX });
         maxPenalty  = DEFAULT_MAX_PENALTY;
       }
     }
@@ -143,9 +144,8 @@ public class FailoverSinkProcessor extends AbstractSinkProcessor {
       if(!liveSinks.containsKey(priority)) {
         liveSinks.put(priority, sinks.get(entry.getKey()));
       } else {
-        logger.warn("Sink {} not added to FailverSinkProcessor as priority" +
-            "duplicates that of sink {}", entry.getKey(),
-            liveSinks.get(priority));
+        logger.warn("Sink {} not added to FailverSinkProcessor as priority duplicates that of sink {}",
+                    entry.getKey(), liveSinks.get(priority));
       }
     }
     activeSink = liveSinks.get(liveSinks.lastKey());
@@ -155,17 +155,27 @@ public class FailoverSinkProcessor extends AbstractSinkProcessor {
   public Status process() throws EventDeliveryException {
     // Retry any failed sinks that have gone through their "cooldown" period
     Long now = System.currentTimeMillis();
+
+    /**
+     * @as.notes
+     * 此处首先尝试从failedSinks中拉起一个Sink ？
+     * 由于每次都挑选优先级高的Sink首先使用，那么failedSinks队列中位于队列前部的肯定是优先级高的Sink
+     *
+     * @as.question
+     * 如果failedSink队列中有多个Sink，是如何保证每个都尝试一遍的？ -- 根据refresh时间来确认队列头部的Sink是否需要重试
+     * */
     while(!failedSinks.isEmpty() && failedSinks.peek().getRefresh() < now) {
       FailedSink cur = failedSinks.poll();
       Status s;
       try {
         s = cur.getSink().process();
         if (s  == Status.READY) {
+          /* 当前Sink已经成功处理过event，已经恢复，重新加入liveSinks并根据优先级重新设置当前activeSink */
           liveSinks.put(cur.getPriority(), cur.getSink());
           activeSink = liveSinks.get(liveSinks.lastKey());
-          logger.debug("Sink {} was recovered from the fail list",
-                  cur.getSink().getName());
+          logger.debug("Sink {} was recovered from the fail list", cur.getSink().getName());
         } else {
+          /* 此次尝试过程中，channel中没有event需要处理，不能证明当前Sink已经恢复 */
           // if it's a backoff it needn't be penalized.
           failedSinks.add(cur);
         }
@@ -176,20 +186,23 @@ public class FailoverSinkProcessor extends AbstractSinkProcessor {
       }
     }
 
+    /**
+     * @as.notes
+     * 注意while代码块和catch代码块中的逻辑，只有当activeSink成功process并返回后，while语句才会退出，
+     * 如果捕捉到异常，会使用后续备用的Sink处理，直到获取下一个activeSink为null时停止并抛出异常。
+     * */
     Status ret = null;
     while(activeSink != null) {
       try {
         ret = activeSink.process();
         return ret;
       } catch (Exception e) {
-        logger.warn("Sink {} failed and has been sent to failover list",
-                activeSink.getName(), e);
+        logger.warn("Sink {} failed and has been sent to failover list", activeSink.getName(), e);
         activeSink = moveActiveToDeadAndGetNext();
       }
     }
 
-    throw new EventDeliveryException("All sinks failed to process, " +
-        "nothing left to failover to");
+    throw new EventDeliveryException("All sinks failed to process, nothing left to failover to");
   }
 
   private Sink moveActiveToDeadAndGetNext() {

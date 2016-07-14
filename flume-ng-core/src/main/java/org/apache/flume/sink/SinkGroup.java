@@ -62,8 +62,6 @@ public class SinkGroup implements Configurable, ConfigurableComponent {
   @Override
   public void configure(ComponentConfiguration conf) {
     this.conf = (SinkGroupConfiguration) conf;
-    processor =
-        SinkProcessorFactory.getProcessor(this.conf.getProcessorContext(),
-            sinks);
+    processor = SinkProcessorFactory.getProcessor(this.conf.getProcessorContext(), sinks);
   }
 }

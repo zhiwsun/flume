@@ -18,3 +18,10 @@ derby.log
 *.iml
 nb-configuration.xml
 .DS_Store
+
+
+*.iml
+*.ipr
+*.iws
+*.ids
+.idea/
